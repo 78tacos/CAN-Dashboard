@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  can-train-monitor:
+    build: .
+    container_name: can-train-monitor
+    ports:
+      - "3000:3000"
+      - "8080:8080"
+    # Privileged mode required for CAN interface access
+    privileged: true
+    # Network mode host for direct access to host's CAN interfaces (Linux)
+    network_mode: host
+    volumes:
+      # Optional: Mount for persistent data or logs
+      - ./logs:/app/logs
+    environment:
+      - HTTP_PORT=3000
+      - WEBSOCKET_PORT=8080
+      - CAN_INTERFACE=vcan0
+      - AUTO_OPEN_BROWSER=false
+    restart: unless-stopped
+    # Note: healthcheck disabled when using network_mode: host
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:3000/train-monitor-standalone.html"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 40s
+
+  # Optional: Service to setup virtual CAN (Linux only)
+  vcan-setup:
+    image: alpine:latest
+    container_name: vcan-setup
+    privileged: true
+    network_mode: host
+    command: >
+      sh -c "
+      apk add --no-cache iproute2 can-utils &&
+      modprobe vcan &&
+      ip link add dev vcan0 type vcan &&
+      ip link set up vcan0 &&
+      echo 'Virtual CAN interface vcan0 created' &&
+      echo 'Testing with candump...' &&
+      echo 'CAN tools available in container' &&
+      tail -f /dev/null
+      "
+    restart: unless-stopped

@@ -1,0 +1,17 @@
+BO_ 256 SPEED: 2 VCU
+ SG_ speed : 0|16@1+ (0.1,0) [0|120] "km/h" DISPLAY
+
+BO_ 512 BATTERY: 3 BMS
+ SG_ level : 0|8@1+ (1,0) [0|100] "%" DISPLAY
+ SG_ voltage : 8|16@1+ (0.1,0) [0|500] "V" DISPLAY
+
+BO_ 768 THERMAL: 3 BMS
+ SG_ temperature : 0|16@1+ (0.1,-40) [-40|85] "degC" DISPLAY
+ SG_ fanSpeed : 16|8@1+ (1,0) [0|100] "%" DISPLAY
+
+BO_ 1024 POWER: 4 VCU
+ SG_ consumption : 0|16@1+ (0.1,0) [0|200] "kW" DISPLAY
+ SG_ current : 16|16@1+ (0.1,0) [0|500] "A" DISPLAY
+
+BO_ 1280 ODOMETER: 4 VCU
+ SG_ odometer : 0|32@1+ (0.1,0) [0|100000] "km" DISPLAY
