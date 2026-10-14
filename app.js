@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Battery, Thermometer, Wind, Zap, Gauge } from 'lucide-react';
 
 const CANBusTrainMonitor = () => {
-  // State for train parameters
   const [speed, setSpeed] = useState(0);
   const [batteryLevel, setBatteryLevel] = useState(100);
   const [batteryTemp, setBatteryTemp] = useState(25);
@@ -10,14 +9,12 @@ const CANBusTrainMonitor = () => {
   const [powerConsumption, setPowerConsumption] = useState(0);
   const [voltage, setVoltage] = useState(400);
   const [current, setCurrent] = useState(0);
-  
-  // Simulation state
+
   const [isRunning, setIsRunning] = useState(false);
   const [targetSpeed, setTargetSpeed] = useState(0);
   const [canConnected, setCanConnected] = useState(false);
   const [wsConnection, setWsConnection] = useState(null);
 
-  // Sample DBC messages
   const dbcMessages = {
     SPEED: { id: 0x100, signals: { speed: { start: 0, length: 16, factor: 0.1, unit: 'km/h' } } },
     BATTERY: { id: 0x200, signals: { 
@@ -34,10 +31,7 @@ const CANBusTrainMonitor = () => {
     }}
   };
 
-  // WebSocket connection for CAN interface
   useEffect(() => {
-    // Connect to CAN gateway WebSocket server
-    // Example: ws://localhost:8080 running python-can bridge
     const connectToCAN = () => {
       try {
         const ws = new WebSocket('ws://localhost:8080');
@@ -73,9 +67,6 @@ const CANBusTrainMonitor = () => {
       }
     };
 
-    // Uncomment to enable real CAN connection
-    // connectToCAN();
-
     return () => {
       if (wsConnection) {
         wsConnection.close();
@@ -83,7 +74,6 @@ const CANBusTrainMonitor = () => {
     };
   }, []);
 
-  // Parse incoming CAN messages based on DBC
   const parseCANMessage = (canMsg) => {
     const { id, data } = canMsg;
     
@@ -113,34 +103,30 @@ const CANBusTrainMonitor = () => {
     }
   };
 
-  // Parse signal from CAN data bytes
   const parseSignal = (data, startBit, length, factor, offset) => {
     const byteIndex = Math.floor(startBit / 8);
     const bitOffset = startBit % 8;
     let value = 0;
     
-    // Extract bits (simplified - assumes little endian)
+    // Little-endian; bits that cross a byte boundary are not fully handled.
     const bytesNeeded = Math.ceil((bitOffset + length) / 8);
     for (let i = 0; i < bytesNeeded && (byteIndex + i) < data.length; i++) {
       value |= (data[byteIndex + i] << (i * 8));
     }
     
-    // Apply bit mask and shift
     const mask = (1 << length) - 1;
     value = (value >> bitOffset) & mask;
     
-    // Apply factor and offset
     return (value * factor) + offset;
   };
 
-  // Encode signal to CAN data bytes
   const encodeSignal = (value, startBit, length, factor, offset) => {
     const rawValue = Math.round((value - offset) / factor);
     const byteIndex = Math.floor(startBit / 8);
     const bitOffset = startBit % 8;
     const data = new Array(8).fill(0);
     
-    // Pack bits (simplified)
+    // Same little-endian simplification as parseSignal.
     const mask = (1 << length) - 1;
     const maskedValue = rawValue & mask;
     
@@ -154,41 +140,33 @@ const CANBusTrainMonitor = () => {
     return data;
   };
 
-  // Simulation logic
   useEffect(() => {
     if (!isRunning) return;
 
     const interval = setInterval(() => {
-      // Update speed towards target
       setSpeed(prev => {
         const diff = targetSpeed - prev;
         return prev + Math.sign(diff) * Math.min(Math.abs(diff), 2);
       });
 
-      // Calculate power consumption based on speed
       const consumption = (speed / 100) * 150; // Max 150 kW
       setPowerConsumption(consumption);
 
-      // Calculate current
       const calc_current = consumption / (voltage / 1000);
       setCurrent(calc_current);
 
-      // Battery drain based on consumption
       setBatteryLevel(prev => Math.max(0, prev - consumption * 0.001));
 
-      // Temperature increases with consumption
       setBatteryTemp(prev => {
         const targetTemp = 25 + (consumption / 150) * 45; // Max 70°C
         return prev + (targetTemp - prev) * 0.05;
       });
 
-      // Fan speed based on temperature
       setFanSpeed(prev => {
         const targetFan = Math.max(0, Math.min(100, (batteryTemp - 30) * 2.5));
         return prev + (targetFan - prev) * 0.1;
       });
 
-      // Voltage slightly drops with load
       setVoltage(400 - (consumption / 150) * 20);
 
     }, 100);
@@ -196,11 +174,9 @@ const CANBusTrainMonitor = () => {
     return () => clearInterval(interval);
   }, [isRunning, speed, targetSpeed, batteryTemp, voltage]);
 
-  // Send CAN message (simulated)
   const sendCANMessage = (messageType, data) => {
     console.log(`CAN TX: ${messageType}`, data);
     
-    // Send via WebSocket if connected
     if (wsConnection && canConnected) {
       let canId, canData;
       
@@ -209,7 +185,6 @@ const CANBusTrainMonitor = () => {
           canId = 0x100;
           canData = encodeSignal(data.speed, 0, 16, 0.1, 0);
           break;
-        // Add other message types as needed
       }
       
       if (canId && canData) {
@@ -253,13 +228,11 @@ const CANBusTrainMonitor = () => {
       `}</style>
       
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold mb-2">Electric Train CAN Bus Monitor</h1>
           <p className="text-gray-400">Real-time vehicle diagnostics and control</p>
         </div>
 
-        {/* Control Panel */}
         <div className="bg-gray-800 rounded-lg p-6 mb-6 border border-gray-700">
           <div className="flex items-center gap-6 flex-wrap">
             <div className={`px-4 py-2 rounded-lg font-semibold ${
@@ -292,9 +265,7 @@ const CANBusTrainMonitor = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Metrics */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Speed Gauge */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <div className="flex items-center gap-3 mb-4">
                 <Gauge className="text-blue-400" size={24} />
@@ -312,7 +283,6 @@ const CANBusTrainMonitor = () => {
               </div>
             </div>
 
-            {/* Battery Status */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <div className="flex items-center gap-3 mb-4">
                 <Battery className={getBatteryColor()} size={24} />
@@ -340,7 +310,6 @@ const CANBusTrainMonitor = () => {
               </div>
             </div>
 
-            {/* Temperature & Cooling */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <div className="flex items-center gap-3 mb-4">
                 <Thermometer className={getTempColor()} size={24} />
@@ -373,7 +342,6 @@ const CANBusTrainMonitor = () => {
               </div>
             </div>
 
-            {/* Power Consumption */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <div className="flex items-center gap-3 mb-4">
                 <Zap className="text-yellow-400" size={24} />
@@ -390,9 +358,7 @@ const CANBusTrainMonitor = () => {
             </div>
           </div>
 
-          {/* Right Column - CAN Messages & Train Animation Space */}
           <div className="space-y-6">
-            {/* CAN Bus Messages */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <h2 className="text-xl font-semibold mb-4">CAN Messages (DBC)</h2>
               <div className="space-y-3 text-sm font-mono">
@@ -418,18 +384,14 @@ const CANBusTrainMonitor = () => {
               </div>
             </div>
 
-            {/* Train Animation */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <h2 className="text-xl font-semibold mb-4">Train Status</h2>
               <div className="relative overflow-hidden h-64 bg-gradient-to-b from-blue-950 via-blue-900 to-gray-900 rounded-lg">
-                {/* Background scenery */}
                 <div className="absolute bottom-0 w-full h-12 bg-gradient-to-t from-green-900 to-transparent opacity-30"></div>
                 
-                {/* Tracks */}
                 <div className="absolute bottom-16 w-full h-1 bg-gray-600"></div>
                 <div className="absolute bottom-14 w-full h-1 bg-gray-500"></div>
                 
-                {/* Speed lines (motion effect) */}
                 {speed > 10 && (
                   <div className="absolute inset-0 opacity-30">
                     {[...Array(5)].map((_, i) => (
@@ -448,7 +410,6 @@ const CANBusTrainMonitor = () => {
                   </div>
                 )}
                 
-                {/* Train */}
                 <div 
                   className="absolute bottom-20 transition-all duration-1000"
                   style={{
@@ -457,7 +418,6 @@ const CANBusTrainMonitor = () => {
                   }}
                 >
                   <svg width="140" height="80" viewBox="0 0 140 80">
-                    {/* Train body - color based on battery */}
                     <defs>
                       <linearGradient id="trainGradient" x1="0%" y1="0%" x2="0%" y2="100%">
                         <stop offset="0%" style={{
@@ -470,7 +430,6 @@ const CANBusTrainMonitor = () => {
                         }} />
                       </linearGradient>
                       
-                      {/* Smoke/steam when low battery (tired) */}
                       {batteryLevel <= 30 && (
                         <filter id="smoke">
                           <feTurbulence type="fractalNoise" baseFrequency="0.05" numOctaves="2" result="turbulence"/>
@@ -479,37 +438,28 @@ const CANBusTrainMonitor = () => {
                       )}
                     </defs>
                     
-                    {/* Main train body */}
                     <rect x="15" y="15" width="110" height="35" fill="url(#trainGradient)" rx="8" stroke="#1e293b" strokeWidth="2"/>
                     
-                    {/* Roof */}
                     <path d="M 20 15 L 30 5 L 110 5 L 120 15 Z" fill={batteryLevel > 60 ? '#60a5fa' : batteryLevel > 30 ? '#fbbf24' : '#f87171'} stroke="#1e293b" strokeWidth="1.5"/>
                     
-                    {/* Windows */}
                     <rect x="25" y="20" width="18" height="15" fill="#dbeafe" rx="3" opacity="0.9"/>
                     <rect x="48" y="20" width="18" height="15" fill="#dbeafe" rx="3" opacity="0.9"/>
                     <rect x="71" y="20" width="18" height="15" fill="#dbeafe" rx="3" opacity="0.9"/>
                     <rect x="94" y="20" width="18" height="15" fill="#dbeafe" rx="3" opacity="0.9"/>
                     
-                    {/* Window dividers */}
                     <line x1="25" y1="27" x2="43" y2="27" stroke="#93c5fd" strokeWidth="0.5"/>
                     <line x1="48" y1="27" x2="66" y2="27" stroke="#93c5fd" strokeWidth="0.5"/>
                     <line x1="71" y1="27" x2="89" y2="27" stroke="#93c5fd" strokeWidth="0.5"/>
                     <line x1="94" y1="27" x2="112" y2="27" stroke="#93c5fd" strokeWidth="0.5"/>
                     
-                    {/* Door */}
                     <rect x="115" y="22" width="8" height="26" fill="#475569" rx="2"/>
                     <circle cx="119" cy="35" r="1" fill="#94a3b8"/>
                     
-                    {/* Battery indicator on side */}
                     <rect x="22" y="42" width="20" height="6" fill="#1e293b" rx="1" stroke="#475569" strokeWidth="0.5"/>
                     <rect x="23" y="43" width={`${batteryLevel * 0.18}`} height="4" 
                           fill={batteryLevel > 60 ? '#22c55e' : batteryLevel > 30 ? '#eab308' : '#ef4444'} rx="0.5"/>
                     
-                    {/* Face - changes based on battery level */}
-                    {/* Eyes */}
                     {batteryLevel > 30 ? (
-                      // Happy/Normal eyes
                       <>
                         <ellipse cx="50" cy="10" rx="3" ry={batteryLevel > 60 ? "4" : "3"} fill="#1e293b"/>
                         <ellipse cx="60" cy="10" rx="3" ry={batteryLevel > 60 ? "4" : "3"} fill="#1e293b"/>
@@ -521,7 +471,6 @@ const CANBusTrainMonitor = () => {
                         )}
                       </>
                     ) : (
-                      // Tired eyes (X shape)
                       <>
                         <line x1="48" y1="9" x2="52" y2="11" stroke="#1e293b" strokeWidth="1.5" strokeLinecap="round"/>
                         <line x1="52" y1="9" x2="48" y2="11" stroke="#1e293b" strokeWidth="1.5" strokeLinecap="round"/>
@@ -530,19 +479,14 @@ const CANBusTrainMonitor = () => {
                       </>
                     )}
                     
-                    {/* Mouth */}
                     {batteryLevel > 60 ? (
-                      // Happy smile
                       <path d="M 45 12 Q 55 15 65 12" stroke="#1e293b" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
                     ) : batteryLevel > 30 ? (
-                      // Neutral
                       <line x1="45" y1="13" x2="65" y2="13" stroke="#1e293b" strokeWidth="1.5" strokeLinecap="round"/>
                     ) : (
-                      // Tired frown
                       <path d="M 45 14 Q 55 12 65 14" stroke="#1e293b" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
                     )}
                     
-                    {/* Steam/exhaust when tired */}
                     {batteryLevel <= 30 && (
                       <>
                         <circle cx="70" cy="8" r="3" fill="#6b7280" opacity="0.4" filter="url(#smoke)">
@@ -556,12 +500,9 @@ const CANBusTrainMonitor = () => {
                       </>
                     )}
                     
-                    {/* Undercarriage */}
                     <rect x="15" y="48" width="110" height="4" fill="#374151" rx="1"/>
                     
-                    {/* Wheels - rotation speed based on train speed */}
                     <g>
-                      {/* Front wheel set */}
                       <circle cx="35" cy="58" r="10" fill="#1f2937" stroke="#111827" strokeWidth="2"/>
                       <circle cx="35" cy="58" r="7" fill="#374151"/>
                       <circle cx="35" cy="58" r="3" fill="#4b5563"/>
@@ -584,7 +525,6 @@ const CANBusTrainMonitor = () => {
                         <line x1="50" y1="58" x2="60" y2="58" stroke="#6b7280" strokeWidth="2"/>
                       </g>
                       
-                      {/* Rear wheel set */}
                       <circle cx="85" cy="58" r="10" fill="#1f2937" stroke="#111827" strokeWidth="2"/>
                       <circle cx="85" cy="58" r="7" fill="#374151"/>
                       <circle cx="85" cy="58" r="3" fill="#4b5563"/>
@@ -608,7 +548,6 @@ const CANBusTrainMonitor = () => {
                       </g>
                     </g>
                     
-                    {/* Headlight */}
                     <circle cx="10" cy="30" r="4" fill={speed > 0 ? '#fef08a' : '#71717a'} stroke="#1e293b" strokeWidth="1">
                       {speed > 0 && (
                         <animate attributeName="opacity" values="1;0.6;1" dur="2s" repeatCount="indefinite"/>
@@ -620,7 +559,6 @@ const CANBusTrainMonitor = () => {
                   </svg>
                 </div>
                 
-                {/* Status text */}
                 <div className="absolute top-4 left-4 text-sm">
                   <div className={`font-semibold ${
                     batteryLevel > 60 ? 'text-green-400' : 
@@ -640,7 +578,6 @@ const CANBusTrainMonitor = () => {
           </div>
         </div>
 
-        {/* DBC File Info */}
         <div className="mt-6 bg-gray-800 rounded-lg p-6 border border-gray-700">
           <h2 className="text-xl font-semibold mb-3">DBC File Structure (Sample)</h2>
           <pre className="bg-gray-900 p-4 rounded text-xs overflow-x-auto text-gray-300">

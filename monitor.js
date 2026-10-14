@@ -1,6 +1,5 @@
 const { useState, useEffect } = React;
 
-// Lucide icons as inline SVG components
 const Battery = ({ className, size = 24 }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" 
          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -57,7 +56,6 @@ const Navigation = ({ className, size = 24 }) => (
 );
 
 const CANBusTrainMonitor = () => {
-  // State for train parameters
   const [speed, setSpeed] = useState(0);
   const [batteryLevel, setBatteryLevel] = useState(100);
   const [batteryTemp, setBatteryTemp] = useState(25);
@@ -66,20 +64,18 @@ const CANBusTrainMonitor = () => {
   const [voltage, setVoltage] = useState(400);
   const [current, setCurrent] = useState(0);
   const [odometer, setOdometer] = useState(0);
-  
-  // Battery specifications (realistic electric train battery)
-  const BATTERY_CAPACITY_AH = 300; // 300 Amp-hours capacity
-  const NOMINAL_VOLTAGE = 400; // 400V nominal voltage
-  const MAX_VOLTAGE = 420; // Fully charged voltage
-  const MIN_VOLTAGE = 340; // Minimum safe voltage (cutoff)
-  const [batteryCapacityRemaining, setBatteryCapacityRemaining] = useState(BATTERY_CAPACITY_AH); // Ah remaining
+
+  const BATTERY_CAPACITY_AH = 300;
+  const NOMINAL_VOLTAGE = 400;
+  const MAX_VOLTAGE = 420; // full charge
+  const MIN_VOLTAGE = 340; // cutoff
+  const [batteryCapacityRemaining, setBatteryCapacityRemaining] = useState(BATTERY_CAPACITY_AH);
   
   const [isRunning, setIsRunning] = useState(false);
   const [targetSpeed, setTargetSpeed] = useState(0);
   const [canConnected, setCanConnected] = useState(false);
   const [wsConnection, setWsConnection] = useState(null);
 
-  // WebSocket connection for CAN interface
   useEffect(() => {
     const connectToCAN = () => {
       try {
@@ -132,7 +128,7 @@ const CANBusTrainMonitor = () => {
       case 0x100:
         const speedVal = parseSignal(data, 0, 16, 0.1, 0);
         setSpeed(speedVal);
-        setTargetSpeed(speedVal); // Sync slider with incoming speed
+        setTargetSpeed(speedVal); // keep the slider aligned with the bus speed
         break;
       case 0x200:
         const level = parseSignal(data, 0, 8, 1, 0);
@@ -179,7 +175,6 @@ const CANBusTrainMonitor = () => {
     if (!isRunning) return;
 
     const interval = setInterval(() => {
-      // Check if battery is dead - if so, stop the train
       if (batteryLevel <= 0) {
         setSpeed(0);
         setTargetSpeed(0);
@@ -190,49 +185,37 @@ const CANBusTrainMonitor = () => {
       setSpeed(prev => {
         const diff = targetSpeed - prev;
         const newSpeed = prev + Math.sign(diff) * Math.min(Math.abs(diff), 2);
-        
-        // Update odometer based on speed (km/h * time_interval_in_hours)
+
         if (newSpeed > 0) {
-          setOdometer(prevOdo => prevOdo + (newSpeed * (0.1 / 3600))); // 100ms = 0.1s
+          setOdometer(prevOdo => prevOdo + (newSpeed * (0.1 / 3600))); // 100ms in hours
         }
         
         return newSpeed;
       });
 
-      // Power consumption based on speed (kW)
-      // At max speed (120 km/h) = 150 kW, scaled linearly
-      const consumption = (speed / 120) * 150; // kW
+      const consumption = (speed / 120) * 150; // 120 km/h maps to 150 kW
       setPowerConsumption(consumption);
 
-      // Calculate current based on actual battery voltage: P = V * I, so I = P / V
-      // Power in kW, Voltage in V, Current in A
-      const calc_current = (consumption * 1000) / voltage; // Convert kW to W, then I = P/V
+      const calc_current = (consumption * 1000) / voltage; // kW to W
       setCurrent(calc_current);
 
-      // Update battery capacity (Amp-hours consumed)
-      // Current (A) * time (hours) = Ah consumed
-      // 100ms = 0.1s = 0.1/3600 hours
-      const timeInterval = 0.1 / 3600; // hours
+      const timeInterval = 0.1 / 3600; // 100ms in hours
       const ahConsumed = calc_current * timeInterval;
       
       setBatteryCapacityRemaining(prev => Math.max(0, prev - ahConsumed));
 
-      // Calculate battery level percentage based on remaining capacity
       const newBatteryLevel = (batteryCapacityRemaining / BATTERY_CAPACITY_AH) * 100;
       setBatteryLevel(Math.max(0, newBatteryLevel));
 
-      // Update voltage based on battery level (voltage drops as battery depletes)
-      // Voltage drops from MAX_VOLTAGE to MIN_VOLTAGE as battery depletes
       const voltageRange = MAX_VOLTAGE - MIN_VOLTAGE;
       const newVoltage = MIN_VOLTAGE + (voltageRange * (newBatteryLevel / 100));
       setVoltage(newVoltage);
 
-      // Temperature increases with power consumption and current
-      // Higher current = more heat (I²R losses)
+      // I^2R losses: current adds heat on top of the power term
       setBatteryTemp(prev => {
         const baseTemp = 25;
-        const powerHeat = (consumption / 150) * 30; // Up to 30°C from power
-        const currentHeat = (calc_current / 400) * 15; // Up to 15°C from current
+        const powerHeat = (consumption / 150) * 30; // up to 30°C
+        const currentHeat = (calc_current / 400) * 15; // up to 15°C
         const targetTemp = baseTemp + powerHeat + currentHeat;
         return prev + (targetTemp - prev) * 0.05;
       });
@@ -248,7 +231,6 @@ const CANBusTrainMonitor = () => {
   }, [isRunning, speed, targetSpeed, batteryTemp, voltage, batteryLevel, batteryCapacityRemaining]);
 
   const handleSpeedChange = (newSpeed) => {
-    // Don't allow speed changes if battery is dead
     if (batteryLevel <= 0) {
       return;
     }
@@ -267,33 +249,28 @@ const CANBusTrainMonitor = () => {
     return 'text-red-500';
   };
 
-  // Map initialization and train animation
   useEffect(() => {
-    // Wait for Leaflet to be available
     if (typeof L === 'undefined') {
       console.log('Leaflet not loaded yet, waiting...');
       return;
     }
 
-    // Check if map already exists
     const mapContainer = document.getElementById('map');
     if (!mapContainer || mapContainer._leaflet_id) {
       console.log('Map already initialized');
       return;
     }
 
-    // Pennsylvania Railroad route: Harrisburg to Pittsburgh
     const startPoint = [40.2737, -76.8844]; // Harrisburg, PA
     const endPoint = [40.4406, -79.9959];   // Pittsburgh, PA
-    
-    // Historic route following the rivers through mountain passes
+
     const routePoints = [
       [40.2737, -76.8844],  // Harrisburg
       [40.3369, -77.1189],  // Marysville
       [40.3934, -77.3678],  // Duncannon
       [40.4881, -77.7208],  // Lewistown
       [40.5967, -78.0061],  // Huntingdon
-      [40.4817, -78.3947],  // Altoona (famous Horseshoe Curve)
+      [40.4817, -78.3947],  // Altoona (Horseshoe Curve)
       [40.5187, -78.6325],  // Gallitzin
       [40.4261, -78.9206],  // Johnstown
       [40.3256, -79.1522],  // Latrobe
@@ -301,19 +278,16 @@ const CANBusTrainMonitor = () => {
       [40.4406, -79.9959]   // Pittsburgh
     ];
 
-    // Initialize map
     const map = L.map('map', {
       zoomControl: true,
       scrollWheelZoom: true
     }).setView([40.45, -78.4], 8);
 
-    // Add OpenStreetMap tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19
     }).addTo(map);
 
-    // Draw the railroad route
     const routeLine = L.polyline(routePoints, {
       color: '#3b82f6',
       weight: 4,
@@ -321,7 +295,6 @@ const CANBusTrainMonitor = () => {
       dashArray: '10, 5'
     }).addTo(map);
 
-    // Add station markers
     const startMarker = L.marker(startPoint, {
       icon: L.divIcon({
         className: 'station-marker',
@@ -340,7 +313,6 @@ const CANBusTrainMonitor = () => {
     }).addTo(map)
       .bindPopup('<b>Pittsburgh Station</b><br>Destination');
 
-    // Create custom train icon
     const createTrainIcon = (batteryLevel) => {
       return L.divIcon({
         className: 'train-marker',
@@ -361,12 +333,11 @@ const CANBusTrainMonitor = () => {
       });
     };
 
-    // Add train marker
     const trainMarker = L.marker(startPoint, { icon: createTrainIcon(100) })
       .addTo(map)
       .bindPopup('<b>Train Position</b><br>Speed: 0 km/h');
 
-    // Add position marker (smaller circle to show exact position)
+    // Point sits on the coordinate; the train icon is a larger overlay.
     const positionMarker = L.circleMarker(startPoint, {
       radius: 8,
       fillColor: '#22c55e',
@@ -376,7 +347,6 @@ const CANBusTrainMonitor = () => {
       fillOpacity: 0.8
     }).addTo(map);
 
-    // Animate train along the route
     let currentSegment = 0;
     let progress = 0;
 
@@ -385,8 +355,7 @@ const CANBusTrainMonitor = () => {
         return;
       }
 
-      // Calculate progress based on speed (higher speed = faster animation)
-      const progressIncrement = speed / 120000; // Adjusted for smooth animation
+      const progressIncrement = speed / 120000; // tuned so the marker eases along the route
       progress += progressIncrement;
 
       if (progress >= 1) {
@@ -394,22 +363,18 @@ const CANBusTrainMonitor = () => {
         currentSegment = (currentSegment + 1) % (routePoints.length - 1);
       }
 
-      // Interpolate position between two route points
       const start = routePoints[currentSegment];
       const end = routePoints[(currentSegment + 1) % routePoints.length];
       
       const lat = start[0] + (end[0] - start[0]) * progress;
       const lng = start[1] + (end[1] - start[1]) * progress;
 
-      // Update train marker position
       trainMarker.setLatLng([lat, lng]);
       trainMarker.setIcon(createTrainIcon(batteryLevel));
       trainMarker.setPopupContent(`<b>Train Position</b><br>Speed: ${speed.toFixed(1)} km/h<br>Battery: ${batteryLevel.toFixed(1)}%`);
 
-      // Update position marker
       positionMarker.setLatLng([lat, lng]);
-      
-      // Pan map to follow train smoothly (with some offset to keep it centered)
+
       map.panTo([lat, lng], {
         animate: true,
         duration: 0.5,
@@ -417,15 +382,13 @@ const CANBusTrainMonitor = () => {
       });
     };
 
-    // Animation interval
     const animationInterval = setInterval(animateTrain, 50);
 
-    // Cleanup
     return () => {
       clearInterval(animationInterval);
       map.remove();
     };
-  }, []); // Empty dependency array - only run once on mount
+  }, []); // map is created once
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white p-6">
@@ -495,7 +458,6 @@ const CANBusTrainMonitor = () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
-            {/* Odometer Display */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <div className="flex items-center gap-3 mb-4">
                 <Navigation className="text-green-400" size={24} />
@@ -556,16 +518,12 @@ const CANBusTrainMonitor = () => {
           </div>
 
           <div className="space-y-6">
-            {/* Map with Train Route */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <h2 className="text-xl font-semibold mb-4">Train Route - Pennsylvania Railroad</h2>
               
-              {/* Map Container */}
               <div id="map" className="w-full h-96 rounded-lg overflow-hidden border border-gray-600 relative">
-                {/* Map will be initialized here */}
               </div>
-              
-              {/* Route Info */}
+
               <div className="mt-4 grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <div className="text-gray-400">Route</div>
@@ -579,7 +537,6 @@ const CANBusTrainMonitor = () => {
                 </div>
               </div>
               
-              {/* Status text */}
               <div className="mt-4 text-center">
                 <div className={`font-semibold text-lg ${
                   batteryLevel <= 0 ? 'text-red-500' :
@@ -598,11 +555,9 @@ const CANBusTrainMonitor = () => {
               </div>
             </div>
 
-            {/* Component Status Bars */}
             <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
               <h2 className="text-xl font-semibold mb-4">Component Status</h2>
               <div className="space-y-4">
-                {/* Battery Temperature */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -625,7 +580,6 @@ const CANBusTrainMonitor = () => {
                   </div>
                 </div>
 
-                {/* Fan Speed */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -644,7 +598,6 @@ const CANBusTrainMonitor = () => {
                   </div>
                 </div>
 
-                {/* Power Consumption */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -663,7 +616,6 @@ const CANBusTrainMonitor = () => {
                   </div>
                 </div>
 
-                {/* Current */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -716,6 +668,5 @@ const CANBusTrainMonitor = () => {
   );
 };
 
-// Render the app
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<CANBusTrainMonitor />);

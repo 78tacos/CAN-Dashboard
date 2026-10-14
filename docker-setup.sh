@@ -3,7 +3,6 @@
 
 set -e
 
-# Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
@@ -18,7 +17,6 @@ echo "CAN Bus Train Monitor - Docker Setup"
 echo "============================================"
 echo -e "${NC}"
 
-# Check if Docker is installed
 if ! command -v docker &> /dev/null; then
     echo -e "${YELLOW}Docker is not installed!${NC}"
     echo "Please install Docker:"
@@ -31,7 +29,6 @@ fi
 echo -e "${GREEN}✓ Docker found: $(docker --version)${NC}"
 echo ""
 
-# Menu
 echo "Choose an option:"
 echo "  1) Build image"
 echo "  2) Run container"

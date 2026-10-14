@@ -5,10 +5,8 @@ import json
 import can
 from datetime import datetime
 
-# Configure CAN interface
 bus = can.interface.Bus(channel='vcan0', interface='socketcan')
 
-# Store connected WebSocket clients
 clients = set()
 
 async def can_reader():
@@ -20,7 +18,6 @@ async def can_reader():
         msg = await loop.run_in_executor(None, bus.recv, 0.1)
         
         if msg is not None:
-            # Convert to JSON format
             can_data = {
                 'id': msg.arbitration_id,
                 'data': list(msg.data),
@@ -28,7 +25,6 @@ async def can_reader():
                 'is_extended': msg.is_extended_id
             }
             
-            # Broadcast to all connected clients
             if clients:
                 message = json.dumps(can_data)
                 await asyncio.gather(
@@ -43,18 +39,15 @@ async def websocket_handler(websocket, path):
     
     try:
         async for message in websocket:
-            # Parse incoming message from browser
             try:
                 data = json.loads(message)
                 
-                # Create CAN message
                 can_msg = can.Message(
                     arbitration_id=data['id'],
                     data=data['data'],
                     is_extended_id=data.get('is_extended', False)
                 )
                 
-                # Send to CAN bus
                 bus.send(can_msg)
                 print(f"Sent CAN message: ID=0x{data['id']:X}")
                 
@@ -70,10 +63,8 @@ async def websocket_handler(websocket, path):
         print(f"Client disconnected. Total clients: {len(clients)}")
 
 async def main():
-    # Start CAN reader task
     asyncio.create_task(can_reader())
-    
-    # Start WebSocket server
+
     async with websockets.serve(websocket_handler, "localhost", 8080):
         print("WebSocket server started on ws://localhost:8080")
         print("Connected to CAN interface: vcan0")
