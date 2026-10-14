@@ -15,20 +15,17 @@ import webbrowser
 import os
 from pathlib import Path
 
-# Configuration
 HTTP_PORT = 3000
 WEBSOCKET_PORT = 8080
 CAN_INTERFACE = 'vcan0'  # Change to your CAN interface
 AUTO_OPEN_BROWSER = True
 
-# Store connected WebSocket clients
 clients = set()
 
 class CORSHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
     """HTTP handler with CORS support for React development"""
     
     def end_headers(self):
-        # Add CORS headers
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
@@ -81,14 +78,12 @@ async def websocket_handler(websocket):
             try:
                 data = json.loads(message)
                 
-                # Create CAN message
                 can_msg = can.Message(
                     arbitration_id=data['id'],
                     data=data['data'],
                     is_extended_id=data.get('is_extended', False)
                 )
                 
-                # Send to CAN bus
                 bus.send(can_msg)
                 print(f"→ Sent CAN: ID=0x{data['id']:X}")
                 
@@ -116,10 +111,8 @@ def start_http_server():
 async def start_websocket_server(bus):
     """Start WebSocket server for CAN communication"""
     
-    # Start CAN reader task
     asyncio.create_task(can_reader(bus))
-    
-    # Start WebSocket server
+
     async with websockets.serve(websocket_handler, "localhost", WEBSOCKET_PORT):
         print(f"✓ WebSocket server running on ws://localhost:{WEBSOCKET_PORT}")
         print(f"✓ Connected to CAN interface: {CAN_INTERFACE}")
@@ -135,7 +128,6 @@ def main():
     
     print("Starting server...")
     
-    # Initialize CAN bus
     try:
         global bus
         bus = can.interface.Bus(channel=CAN_INTERFACE, interface='socketcan')
@@ -145,11 +137,9 @@ def main():
         print("  Running in simulation mode (no real CAN data)")
         bus = None
     
-    # Start HTTP server in background thread
     http_thread = threading.Thread(target=start_http_server, daemon=True)
     http_thread.start()
     
-    # Open browser
     if AUTO_OPEN_BROWSER:
         import time
         time.sleep(1)  # Wait for server to start
@@ -163,11 +153,11 @@ def main():
     print("  → Press Ctrl+C to stop")
     print("-"*60 + "\n")
     
-    # Start WebSocket server (blocks)
+    # Blocks on the WebSocket server.
     if bus:
         asyncio.run(start_websocket_server(bus))
     else:
-        # Run without CAN if not available
+        # No SocketCAN interface; still serve the page and WebSocket.
         async def dummy_server():
             async with websockets.serve(websocket_handler, "localhost", WEBSOCKET_PORT):
                 print("Running in simulation mode...")

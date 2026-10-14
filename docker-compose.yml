@@ -12,7 +12,6 @@ services:
     # Network mode host for direct access to host's CAN interfaces (Linux)
     network_mode: host
     volumes:
-      # Optional: Mount for persistent data or logs
       - ./logs:/app/logs
     environment:
       - HTTP_PORT=3000
@@ -20,15 +19,9 @@ services:
       - CAN_INTERFACE=vcan0
       - AUTO_OPEN_BROWSER=false
     restart: unless-stopped
-    # Note: healthcheck disabled when using network_mode: host
-    # healthcheck:
-    #   test: ["CMD", "curl", "-f", "http://localhost:3000/train-monitor-standalone.html"]
-    #   interval: 30s
-    #   timeout: 10s
-    #   retries: 3
-    #   start_period: 40s
+    # No healthcheck: network_mode host does not give the probe a separate port
 
-  # Optional: Service to setup virtual CAN (Linux only)
+  # Linux only; creates vcan0 on the host
   vcan-setup:
     image: alpine:latest
     container_name: vcan-setup
